@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liste des villes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0 auto;
+            display: inline-block;
+            text-align: left;
+        }
+        li {
+            margin: 10px 0;
+        }
+        a {
+            text-decoration: none;
+            color: white;
+            background-color: #007BFF;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        a:hover {
+            background-color: #0056b3;
+        }
+        footer {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <h1>Liste des villes disponibles</h1>
+    <ul>
+        {% if cities %}
+            {% for city in cities %}
+                <li><a href="{{ url_for('city_images', city_name=city) }}">{{ city }}</a></li>
+            {% endfor %}
+        {% else %}
+            <p>Aucune ville disponible pour le moment.</p>
+        {% endif %}
+    </ul>
+    <footer>
+        <a href="{{ url_for('accueil') }}">Retour à l'accueil</a>
+    </footer>
+</body>
+</html>

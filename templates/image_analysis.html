@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse d'image</title>
+    <style>
+        img {
+            width: 50%;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Analyse de l'image</h1>
+    <h2>Image originale</h2>
+    <img src="{{ url_for('serve_image', filename=city + '/' + image_name) }}" alt="Image originale">
+
+    <h2>Masque prédit</h2>
+    <img src="{{ url_for('serve_analysis_image', city=city, filename=image_name.replace('_leftImg8bit.png', '_predicted.png')) }}" alt="Masque prédit">
+</body>
+</html>
