@@ -23,7 +23,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
 
-      - name: Install dependencies
+      - name: Install critical dependencies first
+        run: |
+          python -m pip install numpy==1.25.2
+          python -m pip install tensorflow==2.14.0
+
+      - name: Install remaining dependencies
         run: pip install -r requirements.txt
 
       - name: Zip application for deployment
