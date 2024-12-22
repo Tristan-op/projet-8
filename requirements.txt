@@ -4,3 +4,4 @@ numpy==1.25.2
 tensorflow==2.13.0
 Pillow==10.0.0
 matplotlib==3.7.2
+setuptools>=65.5.0
