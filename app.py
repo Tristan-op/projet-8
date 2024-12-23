@@ -42,13 +42,14 @@ def iou_metric(y_true, y_pred):
     return (intersection + 1e-10) / (union + 1e-10)
 
 # Charger le modèle
-MODEL_PATH = "./models/models/U-Net Miniaug.keras.keras"
+BASE_DIR = os.getcwd()
+MODEL_PATH = os.path.join(BASE_DIR, "models", "U-Net Miniaug.keras.keras")
 
 try:
     model = load_model(MODEL_PATH, custom_objects={
         "dice_coefficient": dice_coefficient,
         "dice_loss": dice_loss,
-        "bce_loss": bce_loss,  # Ajout explicite de bce_loss
+        "bce_loss": bce_loss,
         "iou_metric": iou_metric
     })
     print("Modèle chargé avec succès.")
@@ -56,9 +57,9 @@ except Exception as e:
     print(f"Erreur lors du chargement du modèle : {e}")
 
 # Répertoires principaux
-IMAGE_BASE_FOLDER = "./api_image/"
-MASK_BASE_FOLDER = "./api_mask/"
-ALÉATOIRE_FOLDER = "./aléatoire/"
+IMAGE_BASE_FOLDER = os.path.join(BASE_DIR, "api_image")
+MASK_BASE_FOLDER = os.path.join(BASE_DIR, "api_mask")
+ALÉATOIRE_FOLDER = os.path.join(BASE_DIR, "aléatoire")
 INPUT_SIZE = (256, 256)
 
 # Palette de couleurs pour les classes
@@ -122,10 +123,7 @@ def city_images(city_name):
 
 @app.route('/random_image')
 def random_image():
-    all_images = []
-    for image in os.listdir(ALÉATOIRE_FOLDER):
-        if image.endswith('.png'):
-            all_images.append(image)
+    all_images = [f for f in os.listdir(ALÉATOIRE_FOLDER) if f.endswith('.png')]
 
     if not all_images:
         return "Aucune image disponible dans le répertoire 'aléatoire'.", 404
@@ -153,28 +151,11 @@ def random_image_details(image_name):
         # Appliquer la palette de couleurs au masque prédit
         predicted_mask_colored = apply_palette(predicted_mask, PALETTE)
 
-        # Visualisation
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
-        plt.imshow(img_resized)
-        plt.title("Image")
-        plt.axis("off")
-
-        plt.subplot(1, 2, 2)
-        plt.imshow(predicted_mask_colored)
-        plt.title("Masque prédit")
-        plt.axis("off")
-
-        # Ajouter une légende
-        handles = [plt.Rectangle((0, 0), 1, 1, color=np.array(color)/255) for color in PALETTE]
-        plt.legend(handles, CLASS_LABELS, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-
         # Sauvegarde de l'image temporaire
         temp_dir = tempfile.gettempdir()
         prediction_filename = f"{image_name.replace('.png', '')}_random_visualization.png"
         prediction_path = os.path.join(temp_dir, prediction_filename)
-        plt.savefig(prediction_path, bbox_inches='tight')
-        plt.close()
+        plt.imsave(prediction_path, predicted_mask_colored)
 
         # Redirection avec le chemin temporaire
         return redirect(url_for('serve_tmp_image', filename=prediction_filename))
@@ -182,71 +163,6 @@ def random_image_details(image_name):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/image/<city_name>/<image_name>')
-def image_details(city_name, image_name):
-    image_path = os.path.join(IMAGE_BASE_FOLDER, city_name, image_name)
-    mask_path = os.path.join(MASK_BASE_FOLDER, city_name, image_name.replace('_leftImg8bit.png', '_gtFine_labelIds.png'))
-
-    if not os.path.exists(image_path):
-        return f"Image '{image_name}' introuvable dans la ville '{city_name}'.", 404
-    if not os.path.exists(mask_path):
-        return f"Le masque réel pour l'image '{image_name}' est introuvable.", 404
-
-    try:
-        # Prétraitement de l'image
-        img = Image.open(image_path).convert('RGB')
-        img_resized = ImageOps.fit(img, INPUT_SIZE, Image.Resampling.LANCZOS)
-        img_array = np.array(img_resized) / 255.0
-        img_array = np.expand_dims(img_array, axis=0)
-
-        # Prédiction du modèle
-        prediction = model.predict(img_array)[0]
-        predicted_mask = np.argmax(prediction, axis=-1)
-
-        # Charger le masque réel
-        true_mask = Image.open(mask_path).resize(INPUT_SIZE, Image.NEAREST)
-        true_mask = np.array(true_mask)
-
-        # Appliquer la palette de couleurs au masque prédit
-        predicted_mask_colored = apply_palette(predicted_mask, PALETTE)
-
-        # Visualisation
-        plt.figure(figsize=(15, 5))
-        plt.subplot(1, 3, 1)
-        plt.imshow(img_resized)
-        plt.title("Image")
-        plt.axis("off")
-
-        plt.subplot(1, 3, 2)
-        plt.imshow(true_mask, cmap="gray")  # Masque réel en niveaux de gris
-        plt.title("Masque réel")
-        plt.axis("off")
-
-        plt.subplot(1, 3, 3)
-        plt.imshow(predicted_mask_colored)
-        plt.title("Masque prédit")
-        plt.axis("off")
-
-        # Ajouter une légende
-        handles = [plt.Rectangle((0, 0), 1, 1, color=np.array(color)/255) for color in PALETTE]
-        plt.legend(handles, CLASS_LABELS, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-
-        # Sauvegarde de l'image temporaire
-        temp_dir = tempfile.gettempdir()
-        visualization_filename = f"{image_name.replace('_leftImg8bit.png', '')}_visualization.png"
-        visualization_path = os.path.join(temp_dir, visualization_filename)
-        plt.savefig(visualization_path, bbox_inches='tight')
-        plt.close()
-
-        # Redirection avec le chemin temporaire
-        return redirect(url_for('serve_tmp_image', filename=visualization_filename))
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# =========================================
-# ROUTE : Servir les fichiers temporaires
-# =========================================
 @app.route('/tmp/<filename>')
 def serve_tmp_image(filename):
     """
