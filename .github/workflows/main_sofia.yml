@@ -24,15 +24,9 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
-      - name: Zip application for deployment
-        run: zip -r app.zip .
-
-      - name: Deploy to Azure Web App using ZipDeploy
-        env:
-          AZURE_DEPLOY_USERNAME: ${{ secrets.AZURE_DEPLOY_USERNAME }}
-          AZURE_DEPLOY_PASSWORD: ${{ secrets.AZURE_DEPLOY_PASSWORD }}
-        run: |
-          curl -X POST \
-            -u "$AZURE_DEPLOY_USERNAME:$AZURE_DEPLOY_PASSWORD" \
-            --data-binary @app.zip \
-            "https://sofia-hferg4bdeuekc3h7.scm.francecentral-01.azurewebsites.net/api/zipdeploy"
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'sofia'
+          slot-name: 'production'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
