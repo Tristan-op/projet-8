@@ -29,7 +29,7 @@ jobs:
 
     # Étape 4 : Préparer le déploiement (packaging)
     - name: Archive app for deployment
-      run: zip -r app.zip .
+      run: zip -r main.zip .
 
     # Étape 5 : Déployer sur Azure
     - name: Deploy to Azure Web App
@@ -38,4 +38,4 @@ jobs:
         app-name: "sophia" 
         slot-name: "production"
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: app.zip
+        package: main.zip
