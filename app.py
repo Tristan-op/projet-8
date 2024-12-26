@@ -42,7 +42,7 @@ def iou_metric(y_true, y_pred):
     return (intersection + 1e-10) / (union + 1e-10)
 
 # Charger le modèle
-MODEL_PATH = "./models/VGG16_aug.keras"
+MODEL_PATH = "./models/models/U-Net Miniaug.keras.keras"
 
 try:
     model = load_model(MODEL_PATH, custom_objects={
