@@ -1,16 +1,17 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory
-import os
-import random
-import numpy as np
-import tensorflow as tf
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import register_keras_serializable
 from PIL import Image, ImageOps
+import numpy as np
 import matplotlib.pyplot as plt
+import os
 import tempfile
+import uvicorn
 
-# Initialisation de l'application Flask
-app = Flask(__name__)
+# Initialisation de l'application FastAPI
+app = FastAPI()
 
 # =========================================
 # Fonctions personnalisées pour le modèle
@@ -18,8 +19,8 @@ app = Flask(__name__)
 @register_keras_serializable()
 def dice_coefficient(y_true, y_pred):
     smooth = 1.0
-    intersection = tf.reduce_sum(y_true * y_pred, axis=[1, 2, 3])
-    union = tf.reduce_sum(y_true, axis=[1, 2, 3]) + tf.reduce_sum(y_pred, axis=[1, 2, 3])
+    intersection = np.sum(y_true * y_pred, axis=[1, 2, 3])
+    union = np.sum(y_true, axis=[1, 2, 3]) + np.sum(y_pred, axis=[1, 2, 3])
     return (2. * intersection + smooth) / (union + smooth)
 
 @register_keras_serializable()
@@ -28,22 +29,18 @@ def dice_loss(y_true, y_pred):
 
 @register_keras_serializable()
 def bce_loss(y_true, y_pred):
-    """
-    Binary Cross-Entropy Loss
-    """
     return tf.keras.losses.BinaryCrossentropy()(y_true, y_pred)
 
 @register_keras_serializable()
 def iou_metric(y_true, y_pred):
-    y_true = tf.cast(y_true, tf.bool)
-    y_pred = tf.cast(tf.round(y_pred), tf.bool)
-    intersection = tf.reduce_sum(tf.cast(y_true & y_pred, tf.float32))
-    union = tf.reduce_sum(tf.cast(y_true | y_pred, tf.float32))
+    y_true = np.round(y_true).astype(bool)
+    y_pred = np.round(y_pred).astype(bool)
+    intersection = np.sum(np.logical_and(y_true, y_pred))
+    union = np.sum(np.logical_or(y_true, y_pred))
     return (intersection + 1e-10) / (union + 1e-10)
 
 # Charger le modèle
-BASE_DIR = os.getcwd()
-MODEL_PATH = os.path.join(BASE_DIR, "models", "U-Net Miniaug.keras.keras")
+MODEL_PATH = "./models/U-Net Miniaug.keras"
 
 try:
     model = load_model(MODEL_PATH, custom_objects={
@@ -55,23 +52,20 @@ try:
     print("Modèle chargé avec succès.")
 except Exception as e:
     print(f"Erreur lors du chargement du modèle : {e}")
+    model = None
 
-# Répertoires principaux
-IMAGE_BASE_FOLDER = os.path.join(BASE_DIR, "api_image")
-MASK_BASE_FOLDER = os.path.join(BASE_DIR, "api_mask")
-ALÉATOIRE_FOLDER = os.path.join(BASE_DIR, "aléatoire")
+# Configuration
 INPUT_SIZE = (256, 256)
 
-# Palette de couleurs pour les classes
 PALETTE = [
-    (0, 0, 0),        # Flat : Noir
-    (128, 0, 0),      # Human : Rouge foncé
-    (0, 128, 0),      # Vehicle : Vert foncé
-    (128, 128, 0),    # Construction : Jaune foncé
-    (0, 0, 128),      # Object : Bleu foncé
-    (128, 0, 128),    # Nature : Violet foncé
-    (0, 128, 128),    # Sky : Cyan foncé
-    (128, 128, 128)   # Void : Gris
+    (0, 0, 0),
+    (128, 0, 0),
+    (0, 128, 0),
+    (128, 128, 0),
+    (0, 0, 128),
+    (128, 0, 128),
+    (0, 128, 128),
+    (128, 128, 128),
 ]
 
 CLASS_LABELS = [
@@ -82,7 +76,7 @@ CLASS_LABELS = [
     "Object",
     "Nature",
     "Sky",
-    "Void"
+    "Void",
 ]
 
 def apply_palette(mask, palette):
@@ -95,88 +89,79 @@ def apply_palette(mask, palette):
     return color_mask
 
 # =========================================
-# ROUTES PRINCIPALES
+# ROUTES
 # =========================================
 
-@app.route('/')
-def home():
-    return render_template('home.html')
+@app.get("/", response_class=HTMLResponse)
+async def main_page():
+    return """
+    <html>
+    <head>
+        <title>API de Prédiction</title>
+    </head>
+    <body>
+        <h1>Uploader une Image pour la Prédiction</h1>
+        <form action="/predict" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*">
+            <button type="submit">Envoyer</button>
+        </form>
+    </body>
+    </html>
+    """
 
-@app.route('/accueil')
-def accueil():
-    return render_template('accueil.html')
-
-@app.route('/list_cities')
-def list_cities():
-    if not os.path.exists(IMAGE_BASE_FOLDER):
-        return "Le dossier api_image est introuvable.", 500
-    cities = [d for d in os.listdir(IMAGE_BASE_FOLDER) if os.path.isdir(os.path.join(IMAGE_BASE_FOLDER, d))]
-    return render_template('list_cities.html', cities=cities)
-
-@app.route('/city/<city_name>')
-def city_images(city_name):
-    city_path = os.path.join(IMAGE_BASE_FOLDER, city_name)
-    if not os.path.exists(city_path):
-        return f"Ville '{city_name}' introuvable.", 404
-    images = [f for f in os.listdir(city_path) if f.endswith('_leftImg8bit.png')]
-    return render_template('city.html', city=city_name, images=images)
-
-@app.route('/random_image')
-def random_image():
-    all_images = [f for f in os.listdir(ALÉATOIRE_FOLDER) if f.endswith('.png')]
-
-    if not all_images:
-        return "Aucune image disponible dans le répertoire 'aléatoire'.", 404
-
-    image_name = random.choice(all_images)
-    return redirect(url_for('random_image_details', image_name=image_name))
-
-@app.route('/random_image_details/<image_name>')
-def random_image_details(image_name):
-    image_path = os.path.join(ALÉATOIRE_FOLDER, image_name)
-    if not os.path.exists(image_path):
-        return f"Image '{image_name}' introuvable dans le répertoire 'aléatoire'.", 404
-
+@app.post("/predict", response_class=HTMLResponse)
+async def predict(file: UploadFile = File(...)):
+    # Charger l'image
     try:
-        # Prétraitement de l'image
-        img = Image.open(image_path).convert('RGB')
-        img_resized = ImageOps.fit(img, INPUT_SIZE, Image.Resampling.LANCZOS)
+        img = Image.open(file.file).convert('RGB')
+        img_resized = ImageOps.fit(img, (256, 256), Image.Resampling.LANCZOS)
         img_array = np.array(img_resized) / 255.0
         img_array = np.expand_dims(img_array, axis=0)
 
-        # Prédiction du modèle
+        # Prédire le masque
         prediction = model.predict(img_array)[0]
         predicted_mask = np.argmax(prediction, axis=-1)
 
-        # Appliquer la palette de couleurs au masque prédit
+        # Appliquer la palette
         predicted_mask_colored = apply_palette(predicted_mask, PALETTE)
 
-        # Sauvegarde de l'image temporaire
+        # Sauvegarder temporairement l'image et le masque
         temp_dir = tempfile.gettempdir()
-        prediction_filename = f"{image_name.replace('.png', '')}_random_visualization.png"
-        prediction_path = os.path.join(temp_dir, prediction_filename)
-        plt.imsave(prediction_path, predicted_mask_colored)
+        original_image_path = os.path.join(temp_dir, "uploaded_image.png")
+        predicted_mask_path = os.path.join(temp_dir, "predicted_mask.png")
 
-        # Redirection avec le chemin temporaire
-        return redirect(url_for('serve_tmp_image', filename=prediction_filename))
+        img.save(original_image_path)
+        plt.imsave(predicted_mask_path, predicted_mask_colored)
 
+        # Retourner l'interface avec l'image et le masque
+        return f"""
+        <html>
+        <head>
+            <title>Résultat de Prédiction</title>
+        </head>
+        <body>
+            <h1>Résultat de Prédiction</h1>
+            <h2>Image originale :</h2>
+            <img src="data:image/png;base64,{read_image_as_base64(original_image_path)}" alt="Image originale">
+            <h2>Masque prédit :</h2>
+            <img src="data:image/png;base64,{read_image_as_base64(predicted_mask_path)}" alt="Masque prédit">
+            <form action="/">
+                <button type="submit">OK</button>
+            </form>
+        </body>
+        </html>
+        """
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return f"<h1>Erreur : {str(e)}</h1>"
 
-@app.route('/tmp/<filename>')
-def serve_tmp_image(filename):
-    """
-    Sert les fichiers temporairement sauvegardés.
-    """
-    temp_dir = tempfile.gettempdir()
-    file_path = os.path.join(temp_dir, filename)
-    if os.path.exists(file_path):
-        return send_from_directory(temp_dir, filename)
-    else:
-        return "Fichier temporaire introuvable.", 404
+# Fonction utilitaire pour encoder une image en Base64
+def read_image_as_base64(image_path):
+    import base64
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
 
 # =========================================
-# Lancer l'application Flask
+# Lancer l'application
 # =========================================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
