@@ -1,4 +1,4 @@
-name: Deploy Flask App to Azure Web App
+name: Deploy FastAPI to Azure App Service
 
 on:
   push:
@@ -11,32 +11,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Étape 1 : Récupérer le code depuis le dépôt
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # Étape 1 : Récupérer le code depuis le dépôt
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      # Étape 2 : Configurer la version de Python
-      - name: Set up Python version
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+    # Étape 2 : Configurer Python
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
 
-      # Étape 3 : Installer les dépendances Python
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+    # Étape 3 : Installer les dépendances
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      # Étape 4 : Créer un fichier ZIP pour le déploiement
-      - name: Zip the application files
-        run: |
-          zip -r app.zip .
+    # Étape 4 : Préparer le déploiement (packaging)
+    - name: Archive app for deployment
+      run: zip -r app.zip .
 
-      # Étape 5 : Déployer sur Azure Web App
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'sophia'  # Remplacez par le nom de votre Azure Web App
-          slot-name: 'production'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: app.zip
+    # Étape 5 : Déployer sur Azure
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: "votre-nom-d-app" # Remplacez par le nom de votre App Service
+        slot-name: "production"
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: app.zip
