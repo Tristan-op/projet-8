@@ -27,14 +27,16 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
-      # Étape 4 : Préparer le déploiement
-      - name: Archive app for deployment
-        run: zip -r app.zip .
+      # Étape 4 : Créer un fichier ZIP pour le déploiement
+      - name: Zip the application files
+        run: |
+          zip -r app.zip .
 
       # Étape 5 : Déployer sur Azure Web App
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'sofia'  # Remplacez par le nom de votre Azure Web App
+          app-name: 'sophia'  # Remplacez par le nom de votre Azure Web App
           slot-name: 'production'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: app.zip
