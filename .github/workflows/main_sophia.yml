@@ -24,10 +24,16 @@ jobs:
     # Étape 3 : Installer les dépendances
     - name: Install dependencies
       run: |
+        python -m venv venv
+        source venv/bin/activate      
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # Étape 4 : Déployer directement le code source sur Azure
+    # Étape 4 : Vérifier les fichiers dans le répertoire
+    - name: Check deployment files
+      run: ls -la
+
+    # Étape 5 : Déployer directement le code source sur Azure
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
