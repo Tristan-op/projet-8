@@ -23,12 +23,11 @@ jobs:
 
     # Étape 3 : Installer les dépendances
     - name: Install dependencies
-    run: |
-      python -m venv antenv
-      source antenv/bin/activate
-      python -m pip install --upgrade pip
-      pip install -r requirements.txt
-
+      run: |
+        python -m venv antenv
+        source antenv/bin/activate
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
     # Étape 4 : Vérifier les fichiers dans le répertoire
     - name: Check deployment files
