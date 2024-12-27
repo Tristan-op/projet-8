@@ -1,15 +1,18 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.requests import Request
 import os
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import register_keras_serializable
 from PIL import Image, ImageOps
+import matplotlib.pyplot as plt
 import tempfile
 import base64
-import matplotlib.pyplot as plt
+
+# Désactiver CUDA si non nécessaire
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialisation de l'application FastAPI
 app = FastAPI()
@@ -55,166 +58,67 @@ except Exception as e:
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    """
-    Page d'accueil avec un bouton pour passer à la page d'analyse.
-    """
     return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>S.O.P.H.I.A - Accueil</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f9;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-            }
-            .container {
-                text-align: center;
-                background: #ffffff;
-                border-radius: 10px;
-                padding: 20px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            }
-            .btn {
-                display: inline-block;
-                padding: 10px 20px;
-                font-size: 16px;
-                color: white;
-                background-color: #2980b9;
-                text-decoration: none;
-                border-radius: 5px;
-                margin-top: 20px;
-            }
-            .btn:hover {
-                background-color: #1c598a;
-            }
-        </style>
-    </head>
+    <html>
     <body>
-        <div class="container">
-            <h1>Bienvenue sur S.O.P.H.I.A</h1>
-            <h2>Segmentation Optimisée Pour l'Harmonie Intelligente des Automobiles</h2>
-            <p>Aucune image n'est stockée sur l'application.</p>
-            <a href="/analyze" class="btn">Passer à l'analyse</a>
-        </div>
+    <h1>Bienvenue sur S.O.P.H.I.A</h1>
+    <a href="/analyze">Passer à l'analyse</a>
     </body>
     </html>
     """
 
 @app.get("/analyze", response_class=HTMLResponse)
-async def analyze_page():
-    """
-    Page permettant d'uploader une image pour analyse.
-    """
+async def analyze():
     return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>S.O.P.H.I.A - Analyse</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f9;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-            }
-            .container {
-                text-align: center;
-                background: #ffffff;
-                border-radius: 10px;
-                padding: 20px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            }
-            form {
-                margin-top: 20px;
-            }
-            button {
-                padding: 10px 20px;
-                font-size: 16px;
-                color: white;
-                background-color: #3498db;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-            }
-            button:hover {
-                background-color: #2980b9;
-            }
-        </style>
-    </head>
+    <html>
     <body>
-        <div class="container">
-            <h1>Analyse</h1>
-            <form action="/predict" method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept="image/*" required>
-                <button type="submit">Analyser l'image</button>
-            </form>
-        </div>
+    <h1>Uploader une Image</h1>
+    <form action="/predict" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*">
+        <button type="submit">Analyser</button>
+    </form>
     </body>
     </html>
     """
 
 @app.post("/predict", response_class=HTMLResponse)
 async def predict(file: UploadFile = File(...)):
-    """
-    Traite l'image uploadée, retourne l'image et le masque prédit.
-    """
     try:
+        # Charger l'image
         img = Image.open(file.file).convert("RGB")
         img_resized = ImageOps.fit(img, (256, 256), Image.Resampling.LANCZOS)
         img_array = np.array(img_resized) / 255.0
         img_array = np.expand_dims(img_array, axis=0)
 
+        # Prédiction
         prediction = model.predict(img_array)[0]
         predicted_mask = np.argmax(prediction, axis=-1)
+
+        # Palette appliquée
         predicted_mask_colored = apply_palette(predicted_mask, PALETTE)
 
+        # Sauvegarde temporaire
         temp_dir = tempfile.gettempdir()
-        img_path = os.path.join(temp_dir, "uploaded_image.png")
-        mask_path = os.path.join(temp_dir, "predicted_mask.png")
+        original_image_path = os.path.join(temp_dir, "uploaded_image.png")
+        predicted_mask_path = os.path.join(temp_dir, "predicted_mask.png")
 
-        img.save(img_path)
-        plt.imsave(mask_path, predicted_mask_colored)
+        img.save(original_image_path)
+        plt.imsave(predicted_mask_path, predicted_mask_colored)
 
-        img_base64 = encode_image_to_base64(img_path)
-        mask_base64 = encode_image_to_base64(mask_path)
+        # Encodage Base64 pour affichage
+        original_image_base64 = encode_image_to_base64(original_image_path)
+        predicted_mask_base64 = encode_image_to_base64(predicted_mask_path)
 
+        # Retourne le résultat
         return f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>S.O.P.H.I.A - Résultats</title>
-            <style>
-                img {{
-                    max-width: 100%;
-                    height: auto;
-                }}
-            </style>
-        </head>
+        <html>
         <body>
-            <h1>Résultats de l'analyse</h1>
-            <h2>Image originale</h2>
-            <img src="data:image/png;base64,{img_base64}" alt="Image originale">
-            <h2>Masque prédit</h2>
-            <img src="data:image/png;base64,{mask_base64}" alt="Masque prédit">
+        <h1>Résultat de l'analyse</h1>
+        <img src="data:image/png;base64,{original_image_base64}" alt="Image originale">
+        <img src="data:image/png;base64,{predicted_mask_base64}" alt="Masque prédit">
         </body>
         </html>
         """
-
     except Exception as e:
         return f"<h1>Erreur : {str(e)}</h1>"
 
@@ -223,15 +127,22 @@ async def predict(file: UploadFile = File(...)):
 # =========================================
 
 def apply_palette(mask, palette):
+    """
+    Applique une palette de couleurs à un masque d'indices de classes.
+    """
     color_mask = np.zeros((*mask.shape, 3), dtype=np.uint8)
     for class_id, color in enumerate(palette):
         color_mask[mask == class_id] = color
     return color_mask
 
 def encode_image_to_base64(image_path):
+    """
+    Encode une image en Base64.
+    """
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
+# Palette et labels
 PALETTE = [
     (0, 0, 0),
     (128, 0, 0),
