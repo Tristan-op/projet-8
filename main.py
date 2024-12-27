@@ -186,6 +186,32 @@ async def predict(file: UploadFile = File(...)):
         return f"<h1>Erreur : {str(e)}</h1>"
 
 # =========================================
+# Palette et labels
+# =========================================
+
+PALETTE = [
+    (0, 0, 0),       # Black for "Flat"
+    (128, 0, 0),     # Red for "Human"
+    (0, 128, 0),     # Green for "Vehicle"
+    (128, 128, 0),   # Yellow for "Construction"
+    (0, 0, 128),     # Blue for "Object"
+    (128, 0, 128),   # Magenta for "Nature"
+    (0, 128, 128),   # Cyan for "Sky"
+    (128, 128, 128), # Gray for "Void"
+]
+
+CLASS_LABELS = [
+    "Flat",
+    "Human",
+    "Vehicle",
+    "Construction",
+    "Object",
+    "Nature",
+    "Sky",
+    "Void",
+]
+
+# =========================================
 # Utilitaires
 # =========================================
 
