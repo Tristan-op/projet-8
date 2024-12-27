@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.O.P.H.I.A - Résultat</title>
+</head>
+<body>
+    <h1>Résultat de Prédiction</h1>
+    <h2>Image originale :</h2>
+    <img src="data:image/png;base64,{{ original_image }}" alt="Image originale">
+    
+    <h2>Masque prédit :</h2>
+    <img src="data:image/png;base64,{{ predicted_mask }}" alt="Masque prédit">
+    
+    <h2>Légende :</h2>
+    <ul>
+        {% for item in legend %}
+            <li>
+                <span style="display: inline-block; width: 20px; height: 20px; background-color: {{ item.color }};"></span>
+                {{ item.label }}
+            </li>
+        {% endfor %}
+    </ul>
+    
+    <form action="/">
+        <button type="submit">OK</button>
+    </form>
+</body>
+</html>
