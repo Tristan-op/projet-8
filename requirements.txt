@@ -1,2 +1,8 @@
 fastapi
 uvicorn
+tensorflow
+pillow
+matplotlib
+jinja2
+numpy
+starlette
