@@ -103,13 +103,14 @@ async def predict(request: Request, file: UploadFile = File(...)):
         original_image_base64 = encode_image_to_base64(original_image_path)
         predicted_mask_base64 = encode_image_to_base64(predicted_mask_path)
 
-        # Retourne le template avec les images
+        # Retourne le template avec les images et la légende
         return templates.TemplateResponse(
             "result.html",
             {
                 "request": request,
                 "original_image": original_image_base64,
                 "predicted_mask": predicted_mask_base64,
+                "legend": [{"label": label, "color": f"rgb({color[0]},{color[1]},{color[2]})"} for label, color in zip(CLASS_LABELS, PALETTE)],
             },
         )
 
@@ -146,4 +147,15 @@ PALETTE = [
     (128, 0, 128),
     (0, 128, 128),
     (128, 128, 128),
+]
+
+CLASS_LABELS = [
+    "Flat",
+    "Human",
+    "Vehicle",
+    "Construction",
+    "Object",
+    "Nature",
+    "Sky",
+    "Void",
 ]
